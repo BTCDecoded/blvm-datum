@@ -1,0 +1,17 @@
+name = "blvm-datum"
+version = "0.1.0"
+description = "DATUM Gateway mining protocol module for blvm-node"
+author = "Bitcoin Commons Team"
+entry_point = "blvm-datum"
+
+capabilities = [
+    "read_blockchain",
+    "subscribe_events",
+]
+
+# DATUM module provides:
+# - DATUM protocol client for pool communication (Ocean)
+# - Stratum V1 server for miner communication
+# - Decentralized block template generation via NodeAPI
+
+
