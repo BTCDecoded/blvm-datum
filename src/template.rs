@@ -32,11 +32,13 @@ impl BlockTemplateGenerator {
             .node_api
             .get_block_template(
                 vec!["segwit".to_string()], // Standard segwit rules
-                None,                        // Default coinbase script
-                None,                        // Default coinbase address
+                None,                       // Default coinbase script
+                None,                       // Default coinbase address
             )
             .await
-            .map_err(|e| DatumError::TemplateError(format!("Failed to get block template: {}", e)))?;
+            .map_err(|e| {
+                DatumError::TemplateError(format!("Failed to get block template: {}", e))
+            })?;
 
         info!(
             "Got block template: height={}, {} transactions",
@@ -65,5 +67,3 @@ impl BlockTemplateGenerator {
         Ok(block)
     }
 }
-
-

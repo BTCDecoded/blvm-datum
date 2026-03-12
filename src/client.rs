@@ -86,7 +86,10 @@ impl ModuleClient {
                         // No event available - continue
                     }
                     Err(e) => {
-                        error!("Error receiving event for module {}: {}", module_id_for_events, e);
+                        error!(
+                            "Error receiving event for module {}: {}",
+                            module_id_for_events, e
+                        );
                         break;
                     }
                 }
@@ -103,7 +106,10 @@ impl ModuleClient {
     }
 
     /// Subscribe to events
-    pub async fn subscribe_events(&mut self, event_types: Vec<EventType>) -> Result<(), ModuleError> {
+    pub async fn subscribe_events(
+        &mut self,
+        event_types: Vec<EventType>,
+    ) -> Result<(), ModuleError> {
         let event_count = event_types.len();
         let mut client = self.ipc_client.lock().await;
         let correlation_id = client.next_correlation_id();
@@ -118,7 +124,9 @@ impl ModuleClient {
             Ok(())
         } else {
             Err(ModuleError::OperationError(
-                response.error.unwrap_or_else(|| "Subscription failed".to_string()),
+                response
+                    .error
+                    .unwrap_or_else(|| "Subscription failed".to_string()),
             ))
         }
     }
@@ -133,4 +141,3 @@ impl ModuleClient {
         &mut self.event_receiver
     }
 }
-

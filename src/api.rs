@@ -42,14 +42,19 @@ impl ModuleAPI for DatumModuleApi {
                         "primary_tag": payout.primary_tag,
                         "unique_id": payout.unique_id
                     });
-                    serde_json::to_vec(&json)
-                        .map_err(|e| ModuleError::OperationError(format!("Serialization error: {}", e)))
+                    serde_json::to_vec(&json).map_err(|e| {
+                        ModuleError::OperationError(format!("Serialization error: {}", e))
+                    })
                 } else {
-                    serde_json::to_vec(&serde_json::json!(null))
-                        .map_err(|e| ModuleError::OperationError(format!("Serialization error: {}", e)))
+                    serde_json::to_vec(&serde_json::json!(null)).map_err(|e| {
+                        ModuleError::OperationError(format!("Serialization error: {}", e))
+                    })
                 }
             }
-            _ => Err(ModuleError::OperationError(format!("Unknown method: {}", method))),
+            _ => Err(ModuleError::OperationError(format!(
+                "Unknown method: {}",
+                method
+            ))),
         }
     }
 
@@ -61,4 +66,3 @@ impl ModuleAPI for DatumModuleApi {
         1
     }
 }
-

@@ -20,4 +20,3 @@ pub use error::DatumError;
 pub use pool::*;
 pub use server::*;
 pub use template::*;
-

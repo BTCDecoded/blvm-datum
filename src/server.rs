@@ -32,10 +32,7 @@ pub struct DatumServer {
 
 impl DatumServer {
     /// Create a new DATUM server
-    pub async fn new(
-        ctx: &ModuleContext,
-        node_api: Arc<dyn NodeAPI>,
-    ) -> Result<Self, DatumError> {
+    pub async fn new(ctx: &ModuleContext, node_api: Arc<dyn NodeAPI>) -> Result<Self, DatumError> {
         let template_generator = Arc::new(BlockTemplateGenerator::new(Arc::clone(&node_api)));
         let pool = Arc::new(RwLock::new(DatumPool::new()));
 
@@ -43,7 +40,9 @@ impl DatumServer {
         let pool_url = ctx.config.get("pool_url").cloned();
         let pool_username = ctx.config.get("pool_username").cloned();
         let pool_password = ctx.config.get("pool_password").cloned();
-        let pool_public_key = ctx.config.get("pool_public_key")
+        let pool_public_key = ctx
+            .config
+            .get("pool_public_key")
             .and_then(|s| hex::decode(s).ok())
             .and_then(|bytes| {
                 if bytes.len() == 32 {
@@ -56,7 +55,9 @@ impl DatumServer {
             });
 
         // Connect to DATUM pool if configured
-        if let (Some(url), Some(username), Some(password)) = (pool_url, pool_username, pool_password) {
+        if let (Some(url), Some(username), Some(password)) =
+            (pool_url, pool_username, pool_password)
+        {
             let mut pool_guard = pool.write().await;
             if let Some(pk) = pool_public_key {
                 pool_guard.set_pool_public_key(pk);
@@ -70,8 +71,12 @@ impl DatumServer {
         // Register module API for inter-module communication
         let pool_for_api = Arc::clone(&pool);
         let module_api = Arc::new(DatumModuleApi::new(pool_for_api));
-        node_api.register_module_api(module_api).await
-            .map_err(|e| DatumError::NodeApiError(format!("Failed to register module API: {}", e)))?;
+        node_api
+            .register_module_api(module_api)
+            .await
+            .map_err(|e| {
+                DatumError::NodeApiError(format!("Failed to register module API: {}", e))
+            })?;
 
         Ok(Self {
             pool,
@@ -129,16 +134,18 @@ impl DatumServer {
     async fn update_block_template(&self, template: Block) -> Result<(), DatumError> {
         let mut pool = self.pool.write().await;
         pool.set_template(template.clone()).await?;
-        
+
         // Get coinbase payout requirements (if connected to pool)
         if let Some(coinbase_payout) = pool.get_coinbase_payout() {
-            info!("Coinbase payout requirements: {} outputs, tag: {}", 
-                  coinbase_payout.outputs.len(), 
-                  coinbase_payout.primary_tag);
+            info!(
+                "Coinbase payout requirements: {} outputs, tag: {}",
+                coinbase_payout.outputs.len(),
+                coinbase_payout.primary_tag
+            );
             // TODO: Share coinbase requirements with Stratum V2 module if needed
             // This can be done via inter-module communication
         }
-        
+
         info!("Updated block template in pool");
         Ok(())
     }
@@ -149,4 +156,3 @@ impl DatumServer {
         pool.get_coinbase_payout()
     }
 }
-

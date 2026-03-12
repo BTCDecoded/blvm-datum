@@ -12,18 +12,18 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 
 mod api;
-mod server;
-mod pool;
-mod error;
 mod client;
-mod nodeapi_ipc;
-mod messages;
 mod datum_protocol;
-mod template;
+mod error;
 mod handlers;
+mod messages;
+mod nodeapi_ipc;
+mod pool;
+mod server;
+mod template;
 
-use error::DatumError;
 use client::ModuleClient;
+use error::DatumError;
 use nodeapi_ipc::NodeApiIpc;
 
 /// Command-line arguments for the module
@@ -53,17 +53,26 @@ async fn main() -> Result<()> {
     let args = Args::parse();
 
     // Get module ID (from args or environment)
-    let module_id = args.module_id
+    let module_id = args
+        .module_id
         .or_else(|| std::env::var("MODULE_NAME").ok())
         .unwrap_or_else(|| "blvm-datum".to_string());
 
     // Get socket path (from args, env, or default)
-    let socket_path = args.socket_path
+    let socket_path = args
+        .socket_path
         .or_else(|| std::env::var("BLVM_MODULE_SOCKET").ok().map(PathBuf::from))
-        .or_else(|| std::env::var("MODULE_SOCKET_DIR").ok().map(|d| PathBuf::from(d).join("modules.sock")))
+        .or_else(|| {
+            std::env::var("MODULE_SOCKET_DIR")
+                .ok()
+                .map(|d| PathBuf::from(d).join("modules.sock"))
+        })
         .unwrap_or_else(|| PathBuf::from("data/modules/modules.sock"));
 
-    info!("blvm-datum module starting... (module_id: {}, socket: {:?})", module_id, socket_path);
+    info!(
+        "blvm-datum module starting... (module_id: {}, socket: {:?})",
+        module_id, socket_path
+    );
 
     // Clone socket_path before moving it
     let socket_path_str = socket_path.to_string_lossy().to_string();
@@ -74,7 +83,9 @@ async fn main() -> Result<()> {
         module_id.clone(),
         "blvm-datum".to_string(),
         env!("CARGO_PKG_VERSION").to_string(),
-    ).await {
+    )
+    .await
+    {
         Ok(client) => client,
         Err(e) => {
             error!("Failed to connect to node: {}", e);
@@ -88,8 +99,8 @@ async fn main() -> Result<()> {
         EventType::BlockMined,
         EventType::BlockTemplateUpdated,
         EventType::MiningDifficultyChanged,
-        EventType::NewBlock,  // For stale work detection
-        EventType::ChainReorg, // For chain reorganizations
+        EventType::NewBlock,       // For stale work detection
+        EventType::ChainReorg,     // For chain reorganizations
         EventType::ShareSubmitted, // For share coordination
     ];
 
@@ -106,12 +117,20 @@ async fn main() -> Result<()> {
     let ctx = blvm_node::module::traits::ModuleContext {
         module_id: module_id.clone(),
         config: std::collections::HashMap::new(),
-        data_dir: args.data_dir.unwrap_or_else(|| PathBuf::from("data/modules/blvm-datum")).to_string_lossy().to_string(),
+        data_dir: args
+            .data_dir
+            .unwrap_or_else(|| PathBuf::from("data/modules/blvm-datum"))
+            .to_string_lossy()
+            .to_string(),
         socket_path: socket_path_str,
     };
 
-    let server = server::DatumServer::new(&ctx, Arc::clone(&node_api) as Arc<dyn blvm_node::module::traits::NodeAPI>).await
-        .map_err(|e| anyhow::anyhow!("Failed to create server: {}", e))?;
+    let server = server::DatumServer::new(
+        &ctx,
+        Arc::clone(&node_api) as Arc<dyn blvm_node::module::traits::NodeAPI>,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to create server: {}", e))?;
 
     info!("DATUM Gateway module initialized and running");
 
@@ -133,4 +152,3 @@ async fn main() -> Result<()> {
     warn!("Event receiver closed, module shutting down");
     Ok(())
 }
-

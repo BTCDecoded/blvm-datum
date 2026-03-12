@@ -57,13 +57,19 @@ pub struct BlockNotify {
 pub trait MessageHandler: Send + Sync {
     /// Handle client configuration message (0x99)
     fn handle_client_config(&self, config: ClientConfig) -> Result<(), DatumError> {
-        debug!("Received client config: max_jobs={}, job_timeout={}", 
-               config.max_jobs, config.job_timeout);
+        debug!(
+            "Received client config: max_jobs={}, job_timeout={}",
+            config.max_jobs, config.job_timeout
+        );
         Ok(())
     }
 
     /// Handle job validation message (0x50)
-    fn handle_job_validation(&self, job_id: u8, result: JobValidationResult) -> Result<(), DatumError> {
+    fn handle_job_validation(
+        &self,
+        job_id: u8,
+        result: JobValidationResult,
+    ) -> Result<(), DatumError> {
         match &result {
             JobValidationResult::Valid => {
                 debug!("Job {} validated successfully", job_id);
@@ -81,8 +87,10 @@ pub trait MessageHandler: Send + Sync {
     /// Handle share response message (0x8F)
     fn handle_share_response(&self, response: ShareResponse) -> Result<(), DatumError> {
         if response.accepted {
-            info!("Share accepted: difficulty={}, message={}", 
-                  response.difficulty, response.message);
+            info!(
+                "Share accepted: difficulty={}, message={}",
+                response.difficulty, response.message
+            );
         } else {
             warn!("Share rejected: {}", response.message);
         }
@@ -91,7 +99,11 @@ pub trait MessageHandler: Send + Sync {
 
     /// Handle block notify message (0xF9)
     fn handle_block_notify(&self, notify: BlockNotify) -> Result<(), DatumError> {
-        info!("Block notify: height={}, hash={:?}", notify.height, hex::encode(notify.hash));
+        info!(
+            "Block notify: height={}, hash={:?}",
+            notify.height,
+            hex::encode(notify.hash)
+        );
         Ok(())
     }
 }
@@ -104,16 +116,15 @@ impl MessageHandler for DefaultMessageHandler {}
 /// Parse client configuration message (0x99)
 pub fn parse_client_config(data: &[u8]) -> Result<ClientConfig, DatumError> {
     if data.len() < 13 {
-        return Err(DatumError::ProtocolError("Client config message too short".to_string()));
+        return Err(DatumError::ProtocolError(
+            "Client config message too short".to_string(),
+        ));
     }
 
     let max_jobs = data[0];
-    let job_timeout = u32::from_le_bytes([
-        data[1], data[2], data[3], data[4],
-    ]);
+    let job_timeout = u32::from_le_bytes([data[1], data[2], data[3], data[4]]);
     let share_difficulty = u64::from_le_bytes([
-        data[5], data[6], data[7], data[8],
-        data[9], data[10], data[11], data[12],
+        data[5], data[6], data[7], data[8], data[9], data[10], data[11], data[12],
     ]);
     let params = if data.len() > 13 {
         data[13..].to_vec()
@@ -132,7 +143,9 @@ pub fn parse_client_config(data: &[u8]) -> Result<ClientConfig, DatumError> {
 /// Parse job validation message (0x50)
 pub fn parse_job_validation(data: &[u8]) -> Result<(u8, JobValidationResult), DatumError> {
     if data.is_empty() {
-        return Err(DatumError::ProtocolError("Job validation message empty".to_string()));
+        return Err(DatumError::ProtocolError(
+            "Job validation message empty".to_string(),
+        ));
     }
 
     let job_id = data[0];
@@ -160,13 +173,14 @@ pub fn parse_job_validation(data: &[u8]) -> Result<(u8, JobValidationResult), Da
 /// Parse share response message (0x8F)
 pub fn parse_share_response(data: &[u8]) -> Result<ShareResponse, DatumError> {
     if data.len() < 9 {
-        return Err(DatumError::ProtocolError("Share response message too short".to_string()));
+        return Err(DatumError::ProtocolError(
+            "Share response message too short".to_string(),
+        ));
     }
 
     let accepted = data[0] != 0;
     let difficulty = u64::from_le_bytes([
-        data[1], data[2], data[3], data[4],
-        data[5], data[6], data[7], data[8],
+        data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8],
     ]);
     let message = if data.len() > 9 {
         String::from_utf8_lossy(&data[9..]).to_string()
@@ -184,14 +198,16 @@ pub fn parse_share_response(data: &[u8]) -> Result<ShareResponse, DatumError> {
 /// Parse block notify message (0xF9)
 pub fn parse_block_notify(data: &[u8]) -> Result<BlockNotify, DatumError> {
     if data.len() < 72 {
-        return Err(DatumError::ProtocolError("Block notify message too short".to_string()));
+        return Err(DatumError::ProtocolError(
+            "Block notify message too short".to_string(),
+        ));
     }
 
     let height = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-    
+
     let mut hash = [0u8; 32];
     hash.copy_from_slice(&data[4..36]);
-    
+
     let mut prev_hash = [0u8; 32];
     prev_hash.copy_from_slice(&data[36..68]);
 
@@ -201,4 +217,3 @@ pub fn parse_block_notify(data: &[u8]) -> Result<BlockNotify, DatumError> {
         prev_hash,
     })
 }
-

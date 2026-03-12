@@ -38,5 +38,3 @@ impl From<blvm_node::module::traits::ModuleError> for DatumError {
         DatumError::NodeApiError(e.to_string())
     }
 }
-
-
