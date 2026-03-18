@@ -7,7 +7,7 @@ use crate::api::DatumModuleApi;
 use crate::error::DatumError;
 use crate::pool::DatumPool;
 use crate::template::BlockTemplateGenerator;
-use blvm_node::module::ipc::protocol::{EventPayload, ModuleMessage};
+use blvm_node::module::ipc::protocol::ModuleMessage;
 use blvm_node::module::traits::EventType;
 use blvm_node::module::traits::{ModuleContext, NodeAPI};
 use blvm_protocol::Block;
@@ -22,7 +22,8 @@ use tracing::{debug, info, warn};
 pub struct DatumServer {
     /// DATUM pool client
     pool: Arc<RwLock<DatumPool>>,
-    /// Node API for querying node state
+    /// Node API for querying node state (kept for future event handlers)
+    #[allow(dead_code)]
     node_api: Arc<dyn NodeAPI>,
     /// Block template generator
     template_generator: Arc<BlockTemplateGenerator>,
@@ -92,6 +93,28 @@ impl DatumServer {
         *running = true;
         info!("DATUM Gateway server started (pool communication only)");
         info!("Note: Miners should connect via blvm-stratum-v2 module");
+
+        // Spawn pool message receive loop when connected to pool
+        let pool = self.pool.read().await;
+        if let Some(client) = pool.protocol_client() {
+            let client = std::sync::Arc::clone(&client);
+            drop(pool);
+            tokio::spawn(async move {
+                loop {
+                    match client.receive_message().await {
+                        Ok((cmd, _)) => {
+                            debug!("DATUM pool message received: {:?}", cmd);
+                        }
+                        Err(e) => {
+                            warn!("DATUM pool receive error: {} - stopping loop", e);
+                            break;
+                        }
+                    }
+                }
+            });
+            info!("DATUM pool message loop started");
+        }
+
         Ok(())
     }
 
@@ -99,7 +122,7 @@ impl DatumServer {
     pub async fn handle_event(
         &self,
         event: &ModuleMessage,
-        node_api: &dyn NodeAPI,
+        _node_api: &dyn NodeAPI,
     ) -> Result<(), DatumError> {
         match event {
             ModuleMessage::Event(event_msg) => {
@@ -155,4 +178,59 @@ impl DatumServer {
         let pool = self.pool.read().await;
         pool.get_coinbase_payout()
     }
+
+    /// Get server status for CLI
+    pub async fn get_status(&self) -> DatumStatus {
+        let pool = self.pool.read().await;
+        let pool_connected = pool.protocol_client().is_some();
+        let running = *self.running.read().await;
+        DatumStatus {
+            running,
+            pool_connected,
+        }
+    }
+
+    /// Get pool info for CLI (datum-info, pool-status)
+    pub async fn get_pool_info(&self) -> crate::pool::DatumPoolInfo {
+        let pool = self.pool.read().await;
+        pool.pool_info()
+    }
+
+    /// Submit proof of work to pool (manual CLI / testing)
+    pub async fn submit_pow(&self, pow_data: Vec<u8>) -> Result<bool, DatumError> {
+        let pool = self.pool.read().await;
+        pool.submit_pow(pow_data).await
+    }
+
+    /// Reconnect to DATUM pool
+    pub async fn reconnect_pool(&self) -> Result<String, DatumError> {
+        let mut pool = self.pool.write().await;
+        pool.reconnect().await?;
+        if let Some(client) = pool.protocol_client() {
+            let client = std::sync::Arc::clone(&client);
+            drop(pool);
+            tokio::spawn(async move {
+                loop {
+                    match client.receive_message().await {
+                        Ok((cmd, _)) => {
+                            debug!("DATUM pool message received: {:?}", cmd);
+                        }
+                        Err(e) => {
+                            warn!("DATUM pool receive error: {} - stopping loop", e);
+                            break;
+                        }
+                    }
+                }
+            });
+            info!("DATUM pool message loop restarted");
+        }
+        Ok("Reconnected to DATUM pool".to_string())
+    }
+}
+
+/// DATUM module status (for CLI)
+#[derive(Debug, Clone)]
+pub struct DatumStatus {
+    pub running: bool,
+    pub pool_connected: bool,
 }

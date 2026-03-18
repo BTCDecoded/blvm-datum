@@ -23,8 +23,8 @@ use std::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream as AsyncTcpStream;
 use tracing::{debug, info, warn};
+use crypto_box::PublicKey as CryptoBoxPublicKey;
 use x25519_dalek::{EphemeralSecret, PublicKey, SharedSecret};
-// Note: sodiumoxide needs to be initialized before use
 
 /// DATUM protocol version
 const DATUM_PROTOCOL_VERSION: &str = "v0.4.1-beta";
@@ -207,7 +207,7 @@ impl DatumProtocolClient {
 
         // Initial header XOR key (4 bytes, random)
         use rand::Rng;
-        let mut rng = rand::thread_rng();
+        let mut rng = OsRng;
         let header_key = rng.gen::<u32>();
         hello_msg.extend_from_slice(&header_key.to_le_bytes());
 
@@ -221,36 +221,15 @@ impl DatumProtocolClient {
         hello_msg.extend_from_slice(&signature.to_bytes());
 
         // Encrypt with pool's X25519 public key using crypto_box_seal (NaCl sealed box)
-        // Note: sodiumoxide doesn't have crypto_box_seal, so we implement it manually
-        // Sealed box format: [ephemeral_pubkey(32)][encrypted_data]
-        // We generate an ephemeral keypair and use regular box encryption with zero nonce
+        // Uses crypto_box crate (pure Rust) to avoid blake2b linker conflict with sparse-merkle-tree
         let encrypted_hello = if let Some(pool_pk_bytes) = self.pool_public_key {
-            // Initialize sodiumoxide if not already done
-            sodiumoxide::init().map_err(|e| {
-                DatumError::EncryptionError(format!("sodiumoxide init failed: {:?}", e))
+            let pool_pk = CryptoBoxPublicKey::from_slice(&pool_pk_bytes).map_err(|e| {
+                DatumError::EncryptionError(format!("Invalid pool public key: {}", e))
             })?;
-
-            use sodiumoxide::crypto::box_;
-
-            // Convert pool's X25519 public key to sodiumoxide format
-            let pool_pk = box_::PublicKey::from_slice(&pool_pk_bytes).ok_or_else(|| {
-                DatumError::EncryptionError("Invalid pool public key".to_string())
-            })?;
-
-            // Generate ephemeral keypair for sealed box
-            let (ephemeral_pk, ephemeral_sk) = box_::gen_keypair();
-
-            // Use zero nonce for sealed box (as per NaCl spec)
-            let nonce = box_::Nonce([0u8; 24]);
-
-            // Encrypt using ephemeral keypair
-            let encrypted = box_::seal(&hello_msg, &nonce, &pool_pk, &ephemeral_sk);
-
-            // Prepend ephemeral public key (sealed box format)
-            let mut sealed = Vec::with_capacity(32 + encrypted.len());
-            sealed.extend_from_slice(ephemeral_pk.as_ref());
-            sealed.extend_from_slice(&encrypted);
-            sealed
+            let mut rng = OsRng;
+            pool_pk
+                .seal(&mut rng, &hello_msg)
+                .map_err(|e| DatumError::EncryptionError(e.to_string()))?
         } else {
             // If no pool public key, send unencrypted (for testing/development)
             warn!("No pool public key configured - sending handshake unencrypted");

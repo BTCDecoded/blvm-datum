@@ -5,8 +5,7 @@ use blvm_datum::error::DatumError;
 use blvm_datum::handlers::*;
 use blvm_datum::messages::DatumCommand;
 
-// Note: These tests require internal methods to be public or use integration testing approach
-// For now, we test the public API and message parsing
+// Test strategy: we exercise public API and message parsing; full coverage would need internal access or integration tests.
 
 #[test]
 fn test_parse_client_config() {

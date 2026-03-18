@@ -6,6 +6,7 @@
 use crate::datum_protocol::DatumProtocolClient;
 use crate::error::DatumError;
 use blvm_protocol::Block;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -20,6 +21,16 @@ pub struct CoinbasePayout {
     pub primary_tag: String,
     /// Unique identifier for this payout
     pub unique_id: String,
+}
+
+/// Pool info for CLI (datum-info) and RPC (get_pool_status)
+#[derive(Debug, Clone, Serialize)]
+pub struct DatumPoolInfo {
+    pub pool_url: String,
+    pub pool_connected: bool,
+    pub has_coinbase: bool,
+    pub job_count: usize,
+    pub has_template: bool,
 }
 
 /// Coinbase output specification
@@ -69,6 +80,24 @@ impl DatumPool {
     /// Set pool public key (for crypto_box_seal encryption)
     pub fn set_pool_public_key(&mut self, key: [u8; 32]) {
         self.pool_public_key = Some(key);
+    }
+
+    /// Reconnect to DATUM pool using stored credentials
+    pub async fn reconnect(&mut self) -> Result<(), DatumError> {
+        let (url, username, password) = match (
+            self.pool_url.clone(),
+            self.pool_username.clone(),
+            self.pool_password.clone(),
+        ) {
+            (Some(u), Some(un), Some(pw)) => (u, un, pw),
+            _ => {
+                return Err(DatumError::PoolConnectionError(
+                    "Pool not configured (missing url/username/password)".to_string(),
+                ));
+            }
+        };
+        self.protocol_client = None;
+        self.connect(url, username, password).await
     }
 
     /// Connect to DATUM pool
@@ -298,6 +327,31 @@ impl DatumPool {
 
         debug!("Template set in pool");
         Ok(())
+    }
+
+    /// Get protocol client for pool message loop (when connected)
+    pub fn protocol_client(&self) -> Option<Arc<DatumProtocolClient>> {
+        self.protocol_client.clone()
+    }
+
+    /// Get current block template (for get_last_block RPC)
+    pub fn current_template(&self) -> Option<&Block> {
+        self.current_template.as_ref()
+    }
+
+    /// Get pool info for CLI (datum-info)
+    pub fn pool_info(&self) -> DatumPoolInfo {
+        let pool_url = self.pool_url.clone().unwrap_or_else(|| "(not configured)".to_string());
+        let has_coinbase = self.current_coinbase.is_some();
+        let job_count = self.jobs.len();
+        let has_template = self.current_template.is_some();
+        DatumPoolInfo {
+            pool_url,
+            pool_connected: self.protocol_client.is_some(),
+            has_coinbase,
+            job_count,
+            has_template,
+        }
     }
 
     /// Submit proof of work to pool
