@@ -19,14 +19,10 @@ name = "blvm_datum"
 path = "src/lib.rs"
 
 [dependencies]
-# blvm-node for module system integration
-blvm-node = { path = "../blvm-node", package = "blvm-node" }
-# blvm-sdk for ModuleBootstrap (env-based bootstrap)
-blvm-sdk = { path = "../blvm-sdk", default-features = false, features = ["node"] }
-blvm-sdk-macros = { path = "../blvm-sdk/crates/blvm-sdk-macros" }
-
-# blvm-protocol for types
-blvm-protocol = { path = "../blvm-protocol", package = "blvm-protocol" }
+blvm-node = { version = ">=0.1, <1" }
+blvm-sdk = { version = ">=0.1, <1", default-features = false, features = ["node"] }
+blvm-sdk-macros = { version = ">=0.1, <1" }
+blvm-protocol = { version = ">=0.1, <1" }
 
 # Async runtime
 tokio = { version = "1.48", features = ["full"] }
@@ -67,4 +63,17 @@ hex = "0.4"
 [dev-dependencies]
 # Testing
 tokio-test = "0.4"
+
+# Local monorepo: sibling paths override the version pins above.
+# Strip this section in CI/release (BTCDecoded/rust-ci/strip-patch-crates-io@main).
+[patch.crates-io]
+blvm-node = { path = "../blvm-node" }
+blvm-sdk = { path = "../blvm-sdk" }
+blvm-sdk-macros = { path = "../blvm-sdk/crates/blvm-sdk-macros" }
+blvm-protocol = { path = "../blvm-protocol" }
+blvm-consensus = { path = "../blvm-consensus" }
+blvm-primitives = { path = "../blvm-primitives" }
+blvm-secp256k1 = { path = "../blvm-secp256k1" }
+blvm-muhash = { path = "../blvm-muhash" }
+blvm-spec-lock = { path = "../blvm-spec-lock" }
 
