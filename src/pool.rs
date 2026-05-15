@@ -341,7 +341,10 @@ impl DatumPool {
 
     /// Get pool info for CLI (datum-info)
     pub fn pool_info(&self) -> DatumPoolInfo {
-        let pool_url = self.pool_url.clone().unwrap_or_else(|| "(not configured)".to_string());
+        let pool_url = self
+            .pool_url
+            .clone()
+            .unwrap_or_else(|| "(not configured)".to_string());
         let has_coinbase = self.current_coinbase.is_some();
         let job_count = self.jobs.len();
         let has_template = self.current_template.is_some();

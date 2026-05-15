@@ -17,13 +17,13 @@ use chacha20poly1305::{
     aead::{Aead, AeadCore, KeyInit},
     ChaCha20Poly1305, Key, Nonce,
 };
+use crypto_box::PublicKey as CryptoBoxPublicKey;
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use rand::rngs::OsRng;
 use std::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream as AsyncTcpStream;
 use tracing::{debug, info, warn};
-use crypto_box::PublicKey as CryptoBoxPublicKey;
 use x25519_dalek::{EphemeralSecret, PublicKey, SharedSecret};
 
 /// DATUM protocol version

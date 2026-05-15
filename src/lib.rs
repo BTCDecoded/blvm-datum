@@ -7,8 +7,8 @@
 
 pub mod api;
 pub mod config;
-pub mod module;
 pub mod datum_protocol;
+pub mod module;
 
 pub use config::DatumConfig;
 pub mod error;
@@ -19,7 +19,7 @@ pub mod server;
 pub mod template;
 
 pub use error::DatumError;
-pub use pool::*;
 pub use module::DatumModule;
+pub use pool::*;
 pub use server::*;
 pub use template::*;

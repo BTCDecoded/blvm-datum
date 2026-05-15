@@ -64,10 +64,7 @@ impl DatumModule {
             let info = server.get_pool_info().await;
             Ok::<_, String>(format!(
                 "Pool: {} | Connected: {} | Jobs: {} | Template: {}",
-                info.pool_url,
-                info.pool_connected,
-                info.job_count,
-                info.has_template
+                info.pool_url, info.pool_connected, info.job_count, info.has_template
             ))
         })
     }
@@ -90,8 +87,19 @@ impl DatumModule {
         Ok(self.data_dir.join("config.toml").display().to_string())
     }
 
-    #[on_event(BlockMined, BlockTemplateUpdated, MiningDifficultyChanged, NewBlock, ChainReorg, ShareSubmitted)]
-    async fn on_mining_event(&self, event: &EventMessage, ctx: &InvocationContext) -> Result<(), ModuleError> {
+    #[on_event(
+        BlockMined,
+        BlockTemplateUpdated,
+        MiningDifficultyChanged,
+        NewBlock,
+        ChainReorg,
+        ShareSubmitted
+    )]
+    async fn on_mining_event(
+        &self,
+        event: &EventMessage,
+        ctx: &InvocationContext,
+    ) -> Result<(), ModuleError> {
         let msg = ModuleMessage::Event(event.clone());
         let api = ctx.node_api().expect("node_api required");
         self.server
@@ -104,15 +112,17 @@ impl DatumModule {
     #[command]
     fn submit_pow(&self, _ctx: &InvocationContext, payload: String) -> Result<String, ModuleError> {
         let hex_trimmed = payload.trim_start_matches("0x");
-        let pow_data =
-            hex::decode(hex_trimmed).map_err(|e| ModuleError::Other(e.to_string()))?;
+        let pow_data = hex::decode(hex_trimmed).map_err(|e| ModuleError::Other(e.to_string()))?;
         let server = Arc::clone(&self.server);
         run_async::<_, String, anyhow::Error>(async move {
             let accepted = server
                 .submit_pow(pow_data)
                 .await
                 .map_err(|e| anyhow::anyhow!("submit-pow failed: {}", e))?;
-            Ok(format!("Submitted: {}\n", if accepted { "accepted" } else { "rejected" }))
+            Ok(format!(
+                "Submitted: {}\n",
+                if accepted { "accepted" } else { "rejected" }
+            ))
         })
     }
 }

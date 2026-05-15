@@ -26,15 +26,26 @@ async fn main() -> Result<()> {
 
             let server = DatumServer::new(&ctx, Arc::clone(&node_api))
                 .await
-                .map_err(|e| blvm_node::module::traits::ModuleError::Other(format!("Failed to create server: {}", e)))?;
+                .map_err(|e| {
+                    blvm_node::module::traits::ModuleError::Other(format!(
+                        "Failed to create server: {}",
+                        e
+                    ))
+                })?;
             if let Err(e) = server.start().await {
                 error!("Failed to start DATUM server: {}", e);
-                return Err(blvm_node::module::traits::ModuleError::Other(format!("Server startup failed: {}", e)));
+                return Err(blvm_node::module::traits::ModuleError::Other(format!(
+                    "Server startup failed: {}",
+                    e
+                )));
             }
             tracing::info!("DATUM Gateway module initialized and running");
 
             let server = Arc::new(server);
-            let module = DatumModule { server: Arc::clone(&server), data_dir };
+            let module = DatumModule {
+                server: Arc::clone(&server),
+                data_dir,
+            };
             Ok((module.clone(), module))
         }
     };
