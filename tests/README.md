@@ -49,19 +49,17 @@ public_key = "hex_encoded_32_byte_x25519_public_key"
 
 ### Manual End-to-End Test
 
-1. **Start BLVM Node**:
+1. **Start BLVM node** (operator binary is **`blvm`**):
    ```bash
-   ./target/release/blvm-node --datadir=/tmp/blvm-test
+   ./target/release/blvm --data-dir /tmp/blvm-test --network testnet --rpc-addr 127.0.0.1:18332
    ```
 
-2. **Load DATUM Module**:
+2. **Load DATUM module** (manifest name `blvm-datum`), with the node already running:
    ```bash
-   ./target/release/blvm-node --module=blvm-datum \
-     --module-config=pool_url=testnet.ocean.xyz:8443 \
-     --module-config=pool_username=test_user \
-     --module-config=pool_password=test_password \
-     --module-config=pool_public_key=<hex_key>
+   ./target/release/blvm --rpc-addr 127.0.0.1:18332 module load blvm-datum
    ```
+
+   Configure pool settings via **`blvm config set`** / `blvm.toml` **`[modules].module_configs`** as documented for your deployment — there is no `blvm-node --module=...` flag.
 
 3. **Verify Connection**:
    - Check logs for "Successfully connected to DATUM pool"
@@ -95,15 +93,17 @@ if [ -z "$POOL_KEY" ]; then
     exit 1
 fi
 
-# Start node with DATUM module
-./target/release/blvm-node \
-    --datadir=/tmp/blvm-test \
-    --module=blvm-datum \
-    --module-config="pool_url=$POOL_URL" \
-    --module-config="pool_username=$POOL_USER" \
-    --module-config="pool_password=$POOL_PASS" \
-    --module-config="pool_public_key=$POOL_KEY" \
+# Start node (adjust paths and RPC addr to your layout)
+./target/release/blvm \
+    --data-dir /tmp/blvm-test \
+    --network testnet \
+    --rpc-addr 127.0.0.1:18332 \
     &
+
+NODE_PID=$!
+
+# After the RPC server is up, load the module from a second shell:
+./target/release/blvm --rpc-addr 127.0.0.1:18332 module load blvm-datum
 
 NODE_PID=$!
 
