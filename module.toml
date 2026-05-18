@@ -1,5 +1,5 @@
 name = "blvm-datum"
-version = "0.1.2"
+version = "0.1.3"
 description = "DATUM Gateway mining protocol module for blvm-node"
 author = "Bitcoin Commons Team"
 entry_point = "blvm-datum"
