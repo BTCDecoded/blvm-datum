@@ -8,9 +8,3 @@ capabilities = [
     "read_blockchain",
     "subscribe_events",
 ]
-
-# CI fills url/sha256 on release — do not treat empty entries as real installs.
-[downloads]
-x86_64-linux  = { url = "https://github.com/BTCDecoded/blvm-datum/releases/download/v0.1.2/blvm-datum-x86_64-linux", sha256 = "e133e15842cef9599c1b2ecf2d7830a6b33cbe64d893acaaa2e1513dd218b237" }
-aarch64-linux = { url = "https://github.com/BTCDecoded/blvm-datum/releases/download/v0.1.2/blvm-datum-aarch64-linux", sha256 = "b3a61be2045ce06d882c2a159c219439edf4c5d5e2e1c9b47952bcb545326f19" }
-x86_64-windows= { url = "https://github.com/BTCDecoded/blvm-datum/releases/download/v0.1.2/blvm-datum-x86_64-windows.exe", sha256 = "dcd478ccd740f519f21248f376adcdd6969b6e8e8858bd4a82b5b0786995fdcf" }
