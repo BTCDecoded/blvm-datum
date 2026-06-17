@@ -20,9 +20,9 @@ fn test_header_serialization_roundtrip() {
     let deserialized = DatumProtocolClient::deserialize_header_static(&serialized).unwrap();
     assert_eq!(deserialized.cmd_len, 100);
     assert_eq!(deserialized.reserved, 0);
-    assert_eq!(deserialized.is_signed, true);
-    assert_eq!(deserialized.is_encrypted_pubkey, false);
-    assert_eq!(deserialized.is_encrypted_channel, true);
+    assert!(deserialized.is_signed);
+    assert!(!deserialized.is_encrypted_pubkey);
+    assert!(deserialized.is_encrypted_channel);
     assert_eq!(deserialized.proto_cmd, DatumCommand::Handshake as u8);
 }
 
@@ -50,8 +50,7 @@ fn test_header_serialization_all_commands() {
         let deserialized = DatumProtocolClient::deserialize_header_static(&serialized).unwrap();
         assert_eq!(
             deserialized.proto_cmd, *expected_value,
-            "Command {:?} should serialize to {}",
-            cmd, expected_value
+            "Command {cmd:?} should serialize to {expected_value}"
         );
     }
 
@@ -80,8 +79,7 @@ fn test_header_serialization_all_commands() {
         let expected_masked = (*cmd as u8) & 0x1F;
         assert_eq!(
             deserialized.proto_cmd, expected_masked,
-            "Command {:?} should be masked to {}",
-            cmd, expected_masked
+            "Command {cmd:?} should be masked to {expected_masked}"
         );
     }
 }

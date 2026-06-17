@@ -4,7 +4,7 @@
 
 use crate::error::DatumError;
 use blvm_node::module::traits::NodeAPI;
-use blvm_protocol::{Block, BlockHeader, Hash, Transaction};
+use blvm_protocol::Block;
 use std::sync::Arc;
 use tracing::{debug, info};
 
@@ -36,9 +36,7 @@ impl BlockTemplateGenerator {
                 None,                       // Default coinbase address
             )
             .await
-            .map_err(|e| {
-                DatumError::TemplateError(format!("Failed to get block template: {}", e))
-            })?;
+            .map_err(|e| DatumError::TemplateError(format!("Failed to get block template: {e}")))?;
 
         info!(
             "Got block template: height={}, {} transactions",

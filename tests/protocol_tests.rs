@@ -1,9 +1,6 @@
 //! Unit tests for DATUM protocol implementation
 
-use blvm_datum::datum_protocol::DatumProtocolClient;
-use blvm_datum::error::DatumError;
 use blvm_datum::handlers::*;
-use blvm_datum::messages::DatumCommand;
 
 // Test strategy: we exercise public API and message parsing; full coverage would need internal access or integration tests.
 
@@ -48,7 +45,7 @@ fn test_parse_share_response() {
     data[1..9].copy_from_slice(&5000u64.to_le_bytes()); // difficulty
 
     let response = parse_share_response(&data).unwrap();
-    assert_eq!(response.accepted, true);
+    assert!(response.accepted);
     assert_eq!(response.difficulty, 5000);
 }
 

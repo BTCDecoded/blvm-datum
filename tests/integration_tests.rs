@@ -9,7 +9,7 @@ use blvm_datum::pool::DatumPool;
 #[test]
 fn test_coinbase_payout_parsing() {
     // Test case 1: Simple payout with one output
-    let mut data = vec![0u8; 60];
+    let mut data = [0u8; 60];
     let mut offset = 0;
 
     // value (8 bytes)
@@ -60,7 +60,7 @@ fn test_coinbase_payout_parsing() {
 
 #[test]
 fn test_coinbase_payout_multiple_outputs() {
-    let mut data = vec![0u8; 100];
+    let mut data = [0u8; 100];
     let mut offset = 0;
 
     // value (8 bytes)

@@ -43,25 +43,23 @@ impl ModuleAPI for DatumModuleApi {
                         "unique_id": payout.unique_id
                     });
                     serde_json::to_vec(&json).map_err(|e| {
-                        ModuleError::OperationError(format!("Serialization error: {}", e))
+                        ModuleError::OperationError(format!("Serialization error: {e}"))
                     })
                 } else {
                     serde_json::to_vec(&serde_json::json!(null)).map_err(|e| {
-                        ModuleError::OperationError(format!("Serialization error: {}", e))
+                        ModuleError::OperationError(format!("Serialization error: {e}"))
                     })
                 }
             }
             "submit_pow" => {
                 let pool = self.pool.read().await;
                 match pool.submit_pow(params.to_vec()).await {
-                    Ok(accepted) => {
-                        serde_json::to_vec(&serde_json::json!({ "accepted": accepted })).map_err(
-                            |e| ModuleError::OperationError(format!("Serialization error: {}", e)),
-                        )
-                    }
+                    Ok(accepted) => serde_json::to_vec(
+                        &serde_json::json!({ "accepted": accepted }),
+                    )
+                    .map_err(|e| ModuleError::OperationError(format!("Serialization error: {e}"))),
                     Err(e) => Err(ModuleError::OperationError(format!(
-                        "submit_pow failed: {}",
-                        e
+                        "submit_pow failed: {e}"
                     ))),
                 }
             }
@@ -69,7 +67,7 @@ impl ModuleAPI for DatumModuleApi {
                 let pool = self.pool.read().await;
                 let info = pool.pool_info();
                 serde_json::to_vec(&info)
-                    .map_err(|e| ModuleError::OperationError(format!("Serialization error: {}", e)))
+                    .map_err(|e| ModuleError::OperationError(format!("Serialization error: {e}")))
             }
             "get_last_block" => {
                 let pool = self.pool.read().await;
@@ -84,11 +82,10 @@ impl ModuleAPI for DatumModuleApi {
                     })
                 });
                 serde_json::to_vec(&serde_json::json!({ "block": result }))
-                    .map_err(|e| ModuleError::OperationError(format!("Serialization error: {}", e)))
+                    .map_err(|e| ModuleError::OperationError(format!("Serialization error: {e}")))
             }
             _ => Err(ModuleError::OperationError(format!(
-                "Unknown method: {}",
-                method
+                "Unknown method: {method}"
             ))),
         }
     }

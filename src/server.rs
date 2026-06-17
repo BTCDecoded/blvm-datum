@@ -75,9 +75,7 @@ impl DatumServer {
         node_api
             .register_module_api(module_api)
             .await
-            .map_err(|e| {
-                DatumError::NodeApiError(format!("Failed to register module API: {}", e))
-            })?;
+            .map_err(|e| DatumError::NodeApiError(format!("Failed to register module API: {e}")))?;
 
         Ok(Self {
             pool,

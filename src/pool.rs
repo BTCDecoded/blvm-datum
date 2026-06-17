@@ -9,7 +9,6 @@ use blvm_protocol::Block;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::{debug, info};
 
 /// Coinbase payout information from DATUM pool
@@ -60,6 +59,12 @@ pub struct DatumPool {
     current_template: Option<Block>,
     /// Active jobs
     jobs: HashMap<u8, Block>, // job_id -> block template
+}
+
+impl Default for DatumPool {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DatumPool {

@@ -9,25 +9,25 @@
 
 use crate::error::DatumError;
 use crate::handlers::{
-    parse_block_notify, parse_client_config, parse_job_validation, parse_share_response,
-    DefaultMessageHandler, MessageHandler,
+    DefaultMessageHandler, MessageHandler, parse_block_notify, parse_client_config,
+    parse_job_validation, parse_share_response,
 };
 use crate::messages::{DatumCommand, DatumMessageHeader};
 use chacha20poly1305::{
-    aead::{Aead, AeadCore, KeyInit},
     ChaCha20Poly1305, Key, Nonce,
+    aead::{Aead, KeyInit},
 };
 use crypto_box::PublicKey as CryptoBoxPublicKey;
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use rand::rngs::OsRng;
-use std::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream as AsyncTcpStream;
 use tracing::{debug, info, warn};
-use x25519_dalek::{EphemeralSecret, PublicKey, SharedSecret};
+use x25519_dalek::{EphemeralSecret, PublicKey};
 
 /// DATUM protocol version
 const DATUM_PROTOCOL_VERSION: &str = "v0.4.1-beta";
+#[allow(dead_code)]
 const DATUM_PROTOCOL_MAX_CMD_SIZE: usize = 4194304; // 2^22 bytes
 
 /// DATUM protocol client
@@ -75,7 +75,7 @@ impl DatumEncryptionKeys {
         let ed25519_signing = SigningKey::generate(&mut OsRng);
 
         // Generate X25519 encryption key
-        let x25519_secret = EphemeralSecret::random_from_rng(&mut OsRng);
+        let x25519_secret = EphemeralSecret::random_from_rng(OsRng);
         let x25519_public = PublicKey::from(&x25519_secret);
 
         Self {
@@ -158,7 +158,7 @@ impl DatumProtocolClient {
         // Connect to pool
         let stream = AsyncTcpStream::connect(addr)
             .await
-            .map_err(|e| DatumError::PoolConnectionError(format!("Failed to connect: {}", e)))?;
+            .map_err(|e| DatumError::PoolConnectionError(format!("Failed to connect: {e}")))?;
         *self.stream.write().await = Some(stream);
 
         // Generate local encryption keys
@@ -208,12 +208,12 @@ impl DatumProtocolClient {
         // Initial header XOR key (4 bytes, random)
         use rand::Rng;
         let mut rng = OsRng;
-        let header_key = rng.gen::<u32>();
+        let header_key = rng.r#gen::<u32>();
         hello_msg.extend_from_slice(&header_key.to_le_bytes());
 
         // Padding (random 1-200 bytes)
         let padding_len = rng.gen_range(1..=200);
-        let padding: Vec<u8> = (0..padding_len).map(|_| rng.gen()).collect();
+        let padding: Vec<u8> = (0..padding_len).map(|_| rng.r#gen()).collect();
         hello_msg.extend_from_slice(&padding);
 
         // Sign the message with local Ed25519 key
@@ -224,7 +224,7 @@ impl DatumProtocolClient {
         // Uses crypto_box crate (pure Rust) to avoid blake2b linker conflict with sparse-merkle-tree
         let encrypted_hello = if let Some(pool_pk_bytes) = self.pool_public_key {
             let pool_pk = CryptoBoxPublicKey::from_slice(&pool_pk_bytes).map_err(|e| {
-                DatumError::EncryptionError(format!("Invalid pool public key: {}", e))
+                DatumError::EncryptionError(format!("Invalid pool public key: {e}"))
             })?;
             let mut rng = OsRng;
             pool_pk
@@ -264,12 +264,12 @@ impl DatumProtocolClient {
         stream
             .write_all(&header_xor)
             .await
-            .map_err(|e| DatumError::IoError(e))?;
+            .map_err(DatumError::IoError)?;
         stream
             .write_all(&encrypted_hello)
             .await
-            .map_err(|e| DatumError::IoError(e))?;
-        stream.flush().await.map_err(|e| DatumError::IoError(e))?;
+            .map_err(DatumError::IoError)?;
+        stream.flush().await.map_err(DatumError::IoError)?;
 
         drop(stream_guard);
 
@@ -293,7 +293,7 @@ impl DatumProtocolClient {
 
         // Verify echoed keys match
         let local_ed25519_pk = local_keys.ed25519_public().to_bytes();
-        if &response_data[offset..offset + 32] != &local_ed25519_pk {
+        if response_data[offset..offset + 32] != local_ed25519_pk {
             return Err(DatumError::ProtocolError(
                 "Echoed Ed25519 key mismatch".to_string(),
             ));
@@ -301,7 +301,7 @@ impl DatumProtocolClient {
         offset += 32;
 
         let local_x25519_pk = local_keys.x25519_public_bytes();
-        if &response_data[offset..offset + 32] != &local_x25519_pk {
+        if response_data[offset..offset + 32] != local_x25519_pk {
             return Err(DatumError::ProtocolError(
                 "Echoed X25519 key mismatch".to_string(),
             ));
@@ -309,7 +309,7 @@ impl DatumProtocolClient {
         offset += 32;
 
         let session_ed25519_pk = session_keys.ed25519_public().to_bytes();
-        if &response_data[offset..offset + 32] != &session_ed25519_pk {
+        if response_data[offset..offset + 32] != session_ed25519_pk {
             return Err(DatumError::ProtocolError(
                 "Echoed session Ed25519 key mismatch".to_string(),
             ));
@@ -317,7 +317,7 @@ impl DatumProtocolClient {
         offset += 32;
 
         let session_x25519_pk = session_keys.x25519_public_bytes();
-        if &response_data[offset..offset + 32] != &session_x25519_pk {
+        if response_data[offset..offset + 32] != session_x25519_pk {
             return Err(DatumError::ProtocolError(
                 "Echoed session X25519 key mismatch".to_string(),
             ));
@@ -329,7 +329,7 @@ impl DatumProtocolClient {
             .try_into()
             .map_err(|_| DatumError::ProtocolError("Invalid pool Ed25519 key".to_string()))?;
         let pool_session_ed25519_pk = VerifyingKey::from_bytes(&pool_session_ed25519_pk_bytes)
-            .map_err(|e| DatumError::ProtocolError(format!("Invalid Ed25519 key: {}", e)))?;
+            .map_err(|e| DatumError::ProtocolError(format!("Invalid Ed25519 key: {e}")))?;
         offset += 32;
 
         // Store pool's Ed25519 public key for signature verification
@@ -348,7 +348,6 @@ impl DatumProtocolClient {
             .unwrap_or(response_data.len() - offset);
         let motd = String::from_utf8_lossy(&response_data[offset..offset + motd_end]);
         info!("DATUM Server MOTD: {}", motd);
-        offset += motd_end + 1;
 
         // Derive shared secret using X25519
         // x25519-dalek: EphemeralSecret * PublicKey = SharedSecret
@@ -364,8 +363,8 @@ impl DatumProtocolClient {
         let recv_key = self.derive_key_from_shared_secret(shared_secret_bytes, b"recv");
 
         // Initialize ChaCha20Poly1305 ciphers
-        *self.send_cipher.write().await = Some(ChaCha20Poly1305::new(&Key::from_slice(&send_key)));
-        *self.recv_cipher.write().await = Some(ChaCha20Poly1305::new(&Key::from_slice(&recv_key)));
+        *self.send_cipher.write().await = Some(ChaCha20Poly1305::new(Key::from_slice(&send_key)));
+        *self.recv_cipher.write().await = Some(ChaCha20Poly1305::new(Key::from_slice(&recv_key)));
 
         // Store remote keys
         // Note: We only store the public keys from the pool, not the signing key
@@ -374,7 +373,7 @@ impl DatumProtocolClient {
         let dummy_signing_key = SigningKey::generate(&mut OsRng);
         *self.remote_keys.write().await = Some(DatumEncryptionKeys {
             ed25519_signing: dummy_signing_key, // Not used for remote keys
-            x25519_secret: EphemeralSecret::random_from_rng(&mut OsRng), // Not used, but needed for struct
+            x25519_secret: EphemeralSecret::random_from_rng(OsRng), // Not used, but needed for struct
             x25519_public: pool_session_x25519_pk,
         });
 
@@ -435,7 +434,7 @@ impl DatumProtocolClient {
                 let nonce = self.create_nonce(send_nonce_value);
                 cipher
                     .encrypt(&nonce, data)
-                    .map_err(|e| DatumError::EncryptionError(format!("Encryption failed: {}", e)))?
+                    .map_err(|e| DatumError::EncryptionError(format!("Encryption failed: {e}")))?
             } else {
                 data.to_vec()
             }
@@ -458,17 +457,17 @@ impl DatumProtocolClient {
         stream
             .write_all(&header_xor)
             .await
-            .map_err(|e| DatumError::IoError(e))?;
+            .map_err(DatumError::IoError)?;
         if !signature.is_empty() {
             stream
                 .write_all(&signature)
                 .await
-                .map_err(|e| DatumError::IoError(e))?;
+                .map_err(DatumError::IoError)?;
         }
         stream
             .write_all(&encrypted_data)
             .await
-            .map_err(|e| DatumError::IoError(e))?;
+            .map_err(DatumError::IoError)?;
 
         Ok(())
     }
@@ -485,7 +484,7 @@ impl DatumProtocolClient {
         stream
             .read_exact(&mut header_bytes)
             .await
-            .map_err(|e| DatumError::IoError(e))?;
+            .map_err(DatumError::IoError)?;
 
         // Apply header XOR deobfuscation with feedback
         let header_xor_key = *self.header_xor_key.lock().await;
@@ -499,7 +498,7 @@ impl DatumProtocolClient {
             stream
                 .read_exact(&mut sig)
                 .await
-                .map_err(|e| DatumError::IoError(e))?;
+                .map_err(DatumError::IoError)?;
             Some(sig)
         } else {
             None
@@ -510,7 +509,7 @@ impl DatumProtocolClient {
         stream
             .read_exact(&mut encrypted_data)
             .await
-            .map_err(|e| DatumError::IoError(e))?;
+            .map_err(DatumError::IoError)?;
 
         // Verify signature if present and pool's public key is known
         if let Some(sig_bytes) = &signature_bytes {
@@ -548,7 +547,7 @@ impl DatumProtocolClient {
                 let nonce = self.create_nonce(recv_nonce_value);
                 cipher
                     .decrypt(&nonce, encrypted_data.as_ref())
-                    .map_err(|e| DatumError::EncryptionError(format!("Decryption failed: {}", e)))?
+                    .map_err(|e| DatumError::EncryptionError(format!("Decryption failed: {e}")))?
             } else {
                 encrypted_data
             }
@@ -667,7 +666,7 @@ impl DatumProtocolClient {
         nonce_bytes[..8].copy_from_slice(&counter.to_le_bytes());
         // Nonce::from_slice returns a reference, we need to clone the underlying array
         // Nonce is GenericArray which implements Clone
-        Nonce::from_slice(&nonce_bytes).clone()
+        *Nonce::from_slice(&nonce_bytes)
     }
 
     /// Apply header XOR obfuscation with feedback mechanism
@@ -710,7 +709,7 @@ impl DatumProtocolClient {
         use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(b"datum_nonce_init");
-        hasher.update(&header_key.to_le_bytes());
+        hasher.update(header_key.to_le_bytes());
         hasher.update(DATUM_PROTOCOL_VERSION.as_bytes());
         let hash = hasher.finalize();
 
@@ -784,7 +783,7 @@ impl DatumProtocolClient {
                 return Err(DatumError::ProtocolError(format!(
                     "Unknown response code: {}",
                     data[0]
-                )))
+                )));
             }
         };
 

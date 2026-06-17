@@ -105,7 +105,7 @@ impl DatumModule {
         self.server
             .handle_event(&msg, api.as_ref())
             .await
-            .map_err(|e| ModuleError::Other(e.to_string().into()))
+            .map_err(|e| ModuleError::Other(e.to_string()))
     }
 
     /// Manually submit PoW to pool (hex-encoded payload; for testing).

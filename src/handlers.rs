@@ -3,8 +3,6 @@
 //! Handles incoming protocol messages from DATUM pools
 
 use crate::error::DatumError;
-use crate::messages::DatumCommand;
-use blvm_protocol::Block;
 use tracing::{debug, info, warn};
 
 /// Client configuration from pool
