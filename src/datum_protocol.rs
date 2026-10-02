@@ -27,8 +27,6 @@ use x25519_dalek::{EphemeralSecret, PublicKey};
 
 /// DATUM protocol version
 const DATUM_PROTOCOL_VERSION: &str = "v0.4.1-beta";
-#[allow(dead_code)]
-const DATUM_PROTOCOL_MAX_CMD_SIZE: usize = 4194304; // 2^22 bytes
 
 /// DATUM protocol client
 /// Uses interior mutability for thread-safe access
