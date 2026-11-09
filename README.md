@@ -25,15 +25,16 @@ listen_addr = "0.0.0.0:3333"
 [modules.blvm-datum]
 pool_url = "https://ocean.xyz/datum"
 pool_username = "user"
-pool_password = "pass"
-# pool_public_key = "hex_encoded_32_byte_public_key"  # optional
+# Leave pool_public_key unset and the channel is not encrypted. Do not commit a password.
+# pool_password = ""
+# pool_public_key = "hex_encoded_32_byte_public_key"
 # reconnect_interval = 30
 # min_difficulty = 1
 ```
 
 Module data-dir `config.toml` uses the same keys (no `[mining]` table, no `coinbase_tag_*` or `pool_address` — those come from the pool).
 
-Operator docs: [Datum module](https://docs.thebitcoincommons.org/modules/datum.html) in the BLVM book.
+Operator docs: [Datum module](https://docs.btcdecoded.org/blvm/modules/datum.html) in the BLVM book.
 
 ## Dependencies
 
