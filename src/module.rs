@@ -77,7 +77,7 @@ impl DatumModule {
             server
                 .reconnect_pool()
                 .await
-                .map_err(|e| anyhow::anyhow!("Reconnect failed: {}", e))
+                .map_err(|e| anyhow::anyhow!("Reconnect failed: {e}"))
         })
     }
 
@@ -92,8 +92,7 @@ impl DatumModule {
         BlockTemplateUpdated,
         MiningDifficultyChanged,
         NewBlock,
-        ChainReorg,
-        ShareSubmitted
+        ChainReorg
     )]
     async fn on_mining_event(
         &self,
@@ -118,7 +117,7 @@ impl DatumModule {
             let accepted = server
                 .submit_pow(pow_data)
                 .await
-                .map_err(|e| anyhow::anyhow!("submit-pow failed: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("submit-pow failed: {e}"))?;
             Ok(format!(
                 "Submitted: {}\n",
                 if accepted { "accepted" } else { "rejected" }
