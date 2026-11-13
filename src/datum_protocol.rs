@@ -55,6 +55,8 @@ pub struct DatumProtocolClient {
     pool_ed25519_public: tokio::sync::RwLock<Option<VerifyingKey>>,
     /// Connection state (atomic for lock-free reads)
     connected: std::sync::atomic::AtomicBool,
+    /// Handshake reply verified against the configured pool key.
+    authenticated: std::sync::atomic::AtomicBool,
 }
 
 /// DATUM encryption keys (Ed25519 for signing, X25519 for encryption)
@@ -111,6 +113,7 @@ impl DatumProtocolClient {
             pool_ed25519_public: tokio::sync::RwLock::new(None),
             message_handler: tokio::sync::RwLock::new(Box::new(DefaultMessageHandler)),
             connected: std::sync::atomic::AtomicBool::new(false),
+            authenticated: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
@@ -130,7 +133,14 @@ impl DatumProtocolClient {
             pool_ed25519_public: tokio::sync::RwLock::new(None),
             message_handler: tokio::sync::RwLock::new(Box::new(DefaultMessageHandler)),
             connected: std::sync::atomic::AtomicBool::new(false),
+            authenticated: std::sync::atomic::AtomicBool::new(false),
         }
+    }
+
+    /// The handshake reply verified against the configured pool key.
+    pub fn session_authenticated(&self) -> bool {
+        self.authenticated
+            .load(std::sync::atomic::Ordering::Acquire)
     }
 
     /// Set pool public key (for crypto_box_seal)
@@ -221,7 +231,13 @@ impl DatumProtocolClient {
         // Encrypt with pool's X25519 public key using crypto_box_seal (NaCl sealed box)
         // Uses crypto_box crate (pure Rust) to avoid blake2b linker conflict with sparse-merkle-tree
         let encrypted_hello = if let Some(pool_pk_bytes) = self.pool_public_key {
-            let pool_pk = CryptoBoxPublicKey::from_slice(&pool_pk_bytes).map_err(|e| {
+            let pool_id = VerifyingKey::from_bytes(&pool_pk_bytes).map_err(|_| {
+                DatumError::EncryptionError(
+                    "pool public key is not an Ed25519 public key".to_string(),
+                )
+            })?;
+            let x25519 = pool_id.to_montgomery().to_bytes();
+            let pool_pk = CryptoBoxPublicKey::from_slice(&x25519).map_err(|e| {
                 DatumError::EncryptionError(format!("Invalid pool public key: {e}"))
             })?;
             let mut rng = OsRng;
@@ -285,6 +301,15 @@ impl DatumProtocolClient {
             return Err(DatumError::ProtocolError(
                 "Handshake response too short".to_string(),
             ));
+        }
+        if let Some(pool_key) = self.pool_public_key {
+            verify_handshake_reply(&pool_key, &response_data)?;
+            self.authenticated
+                .store(true, std::sync::atomic::Ordering::Release);
+        } else {
+            warn!(
+                "DATUM pool key is not configured; coinbase payout from this session will not be used"
+            );
         }
 
         let mut offset = 0;
@@ -786,5 +811,83 @@ impl DatumProtocolClient {
         };
 
         Ok(accepted)
+    }
+}
+
+/// Parse a configured pool key. A bad value is an error, not "no key".
+pub fn parse_pool_public_key(raw: &str) -> Result<[u8; 32], DatumError> {
+    let bytes = hex::decode(raw.trim())
+        .map_err(|err| DatumError::ConfigError(format!("pool_public_key is not hex: {err}")))?;
+    if bytes.len() != 32 {
+        return Err(DatumError::ConfigError(format!(
+            "pool_public_key must be 32 bytes, got {}",
+            bytes.len()
+        )));
+    }
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&bytes);
+    VerifyingKey::from_bytes(&key).map_err(|_| {
+        DatumError::ConfigError("pool_public_key is not an Ed25519 public key".into())
+    })?;
+    Ok(key)
+}
+
+/// The reply is the six echoed and session keys, a NUL-terminated MOTD, and a
+/// 64-byte signature by the configured pool key over those bytes.
+pub fn verify_handshake_reply(pool_key: &[u8; 32], response: &[u8]) -> Result<(), DatumError> {
+    const KEYS: usize = 32 * 6;
+    if response.len() < KEYS + 1 + 64 {
+        return Err(DatumError::ProtocolError(
+            "Handshake response too short".into(),
+        ));
+    }
+    let null_at = response[KEYS..]
+        .iter()
+        .position(|byte| *byte == 0)
+        .ok_or_else(|| {
+            DatumError::ProtocolError("Handshake reply has no MOTD terminator".into())
+        })?;
+    let sig_at = KEYS + null_at + 1;
+    if response.len() < sig_at + 64 {
+        return Err(DatumError::ProtocolError(
+            "Handshake reply is not signed".into(),
+        ));
+    }
+    let id = VerifyingKey::from_bytes(pool_key).map_err(|_| {
+        DatumError::ConfigError("pool_public_key is not an Ed25519 public key".into())
+    })?;
+    let signature = Signature::from_slice(&response[sig_at..sig_at + 64])
+        .map_err(|_| DatumError::ProtocolError("Invalid handshake signature".into()))?;
+    id.verify(&response[..sig_at], &signature).map_err(|_| {
+        DatumError::ProtocolError("Handshake reply is not signed by the configured pool key".into())
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn malformed_pool_key_is_rejected() {
+        assert!(parse_pool_public_key("zz").is_err());
+        assert!(parse_pool_public_key("aa").is_err());
+    }
+
+    #[test]
+    fn handshake_reply_must_match_the_configured_key() {
+        let pool = SigningKey::generate(&mut OsRng);
+        let other = SigningKey::generate(&mut OsRng);
+        let mut body = vec![0u8; 32 * 6];
+        body.extend_from_slice(b"motd");
+        body.push(0);
+        let signature = pool.sign(&body);
+        let mut good = body.clone();
+        good.extend_from_slice(&signature.to_bytes());
+        assert!(verify_handshake_reply(pool.verifying_key().as_bytes(), &good).is_ok());
+
+        let foreign = other.sign(&body);
+        let mut bad = body;
+        bad.extend_from_slice(&foreign.to_bytes());
+        assert!(verify_handshake_reply(pool.verifying_key().as_bytes(), &bad).is_err());
     }
 }

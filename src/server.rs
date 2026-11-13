@@ -41,19 +41,12 @@ impl DatumServer {
         let pool_url = ctx.config.get("pool_url").cloned();
         let pool_username = ctx.config.get("pool_username").cloned();
         let pool_password = ctx.config.get("pool_password").cloned();
-        let pool_public_key = ctx
-            .config
-            .get("pool_public_key")
-            .and_then(|s| hex::decode(s).ok())
-            .and_then(|bytes| {
-                if bytes.len() == 32 {
-                    let mut key = [0u8; 32];
-                    key.copy_from_slice(&bytes);
-                    Some(key)
-                } else {
-                    None
-                }
-            });
+        let pool_public_key = match ctx.config.get("pool_public_key") {
+            Some(raw) if !raw.trim().is_empty() => {
+                Some(crate::datum_protocol::parse_pool_public_key(raw)?)
+            }
+            _ => None,
+        };
 
         // Connect to DATUM pool if configured
         if let (Some(url), Some(username), Some(password)) =
