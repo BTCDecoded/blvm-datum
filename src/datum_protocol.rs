@@ -816,9 +816,8 @@ impl DatumProtocolClient {
 
 /// Parse a configured pool key. A bad value is an error, not "no key".
 pub fn parse_pool_public_key(raw: &str) -> Result<[u8; 32], DatumError> {
-    let bytes = hex::decode(raw.trim()).map_err(|err| {
-        DatumError::ConfigError(format!("pool_public_key is not hex: {err}"))
-    })?;
+    let bytes = hex::decode(raw.trim())
+        .map_err(|err| DatumError::ConfigError(format!("pool_public_key is not hex: {err}")))?;
     if bytes.len() != 32 {
         return Err(DatumError::ConfigError(format!(
             "pool_public_key must be 32 bytes, got {}",
@@ -857,13 +856,10 @@ pub fn verify_handshake_reply(pool_key: &[u8; 32], response: &[u8]) -> Result<()
     let id = VerifyingKey::from_bytes(pool_key).map_err(|_| {
         DatumError::ConfigError("pool_public_key is not an Ed25519 public key".into())
     })?;
-    let signature = Signature::from_slice(&response[sig_at..sig_at + 64]).map_err(|_| {
-        DatumError::ProtocolError("Invalid handshake signature".into())
-    })?;
+    let signature = Signature::from_slice(&response[sig_at..sig_at + 64])
+        .map_err(|_| DatumError::ProtocolError("Invalid handshake signature".into()))?;
     id.verify(&response[..sig_at], &signature).map_err(|_| {
-        DatumError::ProtocolError(
-            "Handshake reply is not signed by the configured pool key".into(),
-        )
+        DatumError::ProtocolError("Handshake reply is not signed by the configured pool key".into())
     })
 }
 
