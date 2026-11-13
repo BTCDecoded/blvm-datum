@@ -316,6 +316,13 @@ impl DatumPool {
 
     /// Get current coinbase payout requirements
     pub fn get_coinbase_payout(&self) -> Option<CoinbasePayout> {
+        let authed = self
+            .protocol_client
+            .as_ref()
+            .is_some_and(|client| client.session_authenticated());
+        if !authed {
+            return None;
+        }
         self.current_coinbase.clone()
     }
 
